@@ -45,14 +45,14 @@ jupyter_client
 jupyter_core
 jupyter_server
 jupyter_server_terminals
-jupyterlab==4.2.4
+jupyterlab
 jupyterlab_pygments
 jupyterlab_server
 jupyterlab_widgets
 kiwisolver
 MarkupSafe
 matplotlib==3.9.0
-matplotlib-inline==0.1.7
+matplotlib-inline
 mistune
 nbclient
 nbconvert
@@ -62,7 +62,7 @@ notebook_shim
 numpy
 overrides
 packaging
-pandas==2.2.2
+pandas=2.2.2
 pandocfilters
 parso
 pillow
