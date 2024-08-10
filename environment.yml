@@ -1,14 +1,17 @@
+name: singularity-onboarding
 channels:
   - conda-forge
 dependencies:
   - python>=3.11
-  - requests
-  - pandas
-  - ipywidgets
-  - ipykernel
-  - ipyaggrid
-  - seaborn
-  - ipympl
-  - tzloca
-  - jupyterlab
-  - nbconvert
+  - pip
+  - pip:
+    - requests
+    - pandas
+    - ipywidgets
+    - ipykernel
+    - ipyaggrid
+    - seaborn
+    - ipympl
+    - tzloca
+    - jupyterlab
+    - nbconvert
