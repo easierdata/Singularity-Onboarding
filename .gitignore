@@ -1,0 +1,14 @@
+# mypy
+.mypy_cache
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache
+
+### Python
+venv
+.venv
+*checkpoint.ipynb
+.ipynb_checkpoints
+__pycache__
