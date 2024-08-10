@@ -6,7 +6,7 @@
 # echo "Environment setup commands go here"
 
 # Automatically run the notebook
-jupyter nbconvert --to notebook --execute --inplace --ClearOutputPreprocessor.enabled=True Onboarding-Tracking.ipynb
+jupyter nbconvert --to notebook --execute Onboarding-Tracking.ipynb
 
 # Launch Jupyter notebook with a specific notebook opened by default
 jupyter notebook --NotebookApp.default_url='/Onboarding-Tracking.ipynb'
