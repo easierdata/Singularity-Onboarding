@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+jupyter contrib nbextension install --user
+jupyter nbextension enable --py --sys-prefix widgetsnbextension
+jupyter nbextension enable --py --sys-prefix qgrid
+jupyter nbextension enable --py --sys-prefix ipyaggrid
+jupyter labextension install --clean @jupyter-widgets/jupyterlab-manager \
+                                      ipyaggrid \
+                                      jupyter-matplotlib
+# Create or append to a 'start' file to launch a specific notebook
+echo "jupyter notebook --NotebookApp.default_url='/Onboarding-Tracking.ipynb'" >> .binder/start
+chmod +x .binder/start
+
+
+# labextensions
+# jupyter labextension install --clean @jupyter-widgets/jupyterlab-manager \
+#                                       @jupyterlab/server-proxy \
+#                                       @jupyterlab/geojson-extension \
+#                                       @pyviz/jupyterlab_pyviz \
+#                                       jupyter-matplotlib \
+#                                       jupyter-leaflet \
+#                                       dask-labextension
+
+# Error installing vscode extensions, comment out for now:
+# Extension 'ms-python.python' not found.
+# Make sure you use the full extension ID, including the publisher, e.g.: ms-vscode.csharp
+# error undefined
+#code-server --install-extension ms-python.python
+
+# Install the VS code proxy (now from conda-forge in environment.yml)
+#pip install git+git://github.com/betatim/vscode-binder#egg=jupyter_vscode_proxy
+
+# EOF
