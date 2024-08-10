@@ -17,6 +17,7 @@ ipyaggrid = "^0.5.4"
 seaborn = "^0.13.2"
 ipympl = "^0.9.4"
 tzlocal = "^5.2"
+jupyter-repo2docker = "^2024.7.0"
 
 
 [build-system]
