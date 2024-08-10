@@ -2,7 +2,6 @@ jupyter contrib nbextension install --user
 jupyter nbextension enable --py widgetsnbextension
 jupyter nbextension enable --py qgrid
 jupyter labextension install @jupyter-widgets/jupyterlab-manager --minimize=False
-
 # Create or append to a 'start' file to launch a specific notebook
-echo "jupyter notebook --NotebookApp.default_url='/Onboarding-Tracking.ipynb'" >> .binder/start
-chmod +x .binder/start
+# echo "jupyter notebook --NotebookApp.default_url='/Onboarding-Tracking.ipynb'" >> .binder/start
+# chmod +x .binder/start
