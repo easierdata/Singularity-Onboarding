@@ -3,7 +3,20 @@ import pandas as pd
 import json
 
 # Base URL for API requests
-BASE_URL = "https://singularity.easierdata.info/api"
+# BASE_URL = "http://192.168.1.40:9090/api"
+# BASE_URL = "http://192.168.1.125:9090/api"
+BASE_URL = "http://192.168.1.5:9090/api"
+
+# Enter filename to save the output
+OUTPUT_FILENAME = "gedi_tutorial_payload"
+
+# Enter the preparation ID you want to process. If 0, all preparations will be processed.
+PREP_ID = 2
+
+# Export a list of all the directories and files in the preparation
+# Set the source id that is linked to the preparation
+EXPORT_FILES = False
+SOURCE_ID = 2
 
 
 def make_post_request(endpoint, data=None):
@@ -39,122 +52,207 @@ def make_get_request(endpoint):
         return None
 
 
-def process_preparations():
+def get_preparations():
     preparations_response = make_get_request("/preparation")
     if preparations_response:
-        preparations = preparations_response  # Assuming this is a list of dicts
-        all_pieces_data = []
-        all_deals_data = []
+        return preparations_response
+    return []
 
-        for prep in preparations:
 
-            # Get the pieces for each preparation
-            prep_id = prep["id"]  # Assuming each preparation has an 'id'
-            pieces_response = make_get_request(f"/preparation/{prep_id}/piece")
-            if pieces_response:
-                # Extract the pieces from each item in the list and then loop through each pieces in the list and extend into a dictionary of lists
-                just_the_pieces = [item["pieces"] for item in pieces_response]
-                just_the_pieces = [
-                    item for sublist in just_the_pieces for item in sublist
-                ]
+def get_pieces_for_preparation(prep_id, prep_name):
+    pieces_response = make_get_request(f"/preparation/{prep_id}/piece")
+    if pieces_response:
+        just_the_pieces = [item["pieces"] for item in pieces_response]
+        just_the_pieces = [item for sublist in just_the_pieces for item in sublist]
+        just_the_pieces = [{**d, "name": prep_name} for d in just_the_pieces]
+        return just_the_pieces
+    return []
 
-                # Add the piece_name to the pieces data
-                just_the_pieces = [{**d, "name": prep["name"]} for d in just_the_pieces]
-                all_pieces_data.extend(just_the_pieces)
 
-            # Get the pieces in deals for each preparation
-            # Create data payload to send into post request
-            data = {"preparations": [f"{prep_id}"]}
+def get_deal_status_for_preparation(prep_id):
+    data = {"preparations": [f"{prep_id}"]}
+    deal_status_response = make_post_request("/deal", data)
+    if deal_status_response:
+        deal_status_response = [
+            {**d, "preparationId": prep_id} for d in deal_status_response
+        ]
+        return deal_status_response
+    return []
 
-            deal_status_response = make_post_request("/deal", data)
-            if deal_status_response:
-                # Add preparation id to each deal status record
-                deal_status_response = [
-                    {**d, "preparationId": prep_id} for d in deal_status_response
-                ]
 
-                # Add deal status data
-                all_deals_data.extend(deal_status_response)
-            else:
-                print(
-                    f"No deals have been made for prepartion id {prep_id} - {prep['name']}"
-                )
+def process_preparations(prep_id: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
+    preparations = get_preparations()
+    all_pieces_data = []
+    all_deals_data = []
 
-        # Assuming all_pieces_data is a list of dicts
-        all_pieces_df = pd.DataFrame(all_pieces_data)
-        all_deals_df = pd.DataFrame(all_deals_data)
+    if prep_id > 0:
+        preparations = [prep for prep in preparations if prep["id"] == prep_id]
 
-        # Get a count of pieces by preperation ID and rename the column to reflect the count
-        pieces_count_by_prep = (
-            all_pieces_df.groupby("preparationId")
-            .size()
-            .reset_index()
-            .rename(columns={0: "TotalPieces"})
-        )
+    for prep in preparations:
+        prep_id = prep["id"]
+        prep_name = prep["name"]
 
-        # Get a count of pieces by preparation ID for scheduled deals. Note, that there may be duplicate pieceIds in the deals data so we need to drop duplicates
-        pieces_count_by_prep_deal = (
-            all_deals_df.drop_duplicates(subset=["pieceCid"])
-            .groupby("preparationId")
-            .size()
-            .reset_index()
-            .rename(columns={0: "ScheduledPieces"})
-        )
+        pieces = get_pieces_for_preparation(prep_id, prep_name)
+        all_pieces_data.extend(pieces)
 
-        pieces_count_by_prep = pd.merge(
-            pieces_count_by_prep,
-            pieces_count_by_prep_deal,
-            on="preparationId",
-            how="left",
-        )
-        # Fill NaN values with 0 and convert to integer
-        pieces_count_by_prep["ScheduledPieces"] = (
-            pieces_count_by_prep["ScheduledPieces"].fillna(0).astype(int)
-        )
+        deals = get_deal_status_for_preparation(prep_id)
+        all_deals_data.extend(deals)
 
-        # Get a count of pieces by preparation ID and status
-        pieces_count_by_prep_status = (
-            all_deals_df.groupby(["preparationId", "state"])
-            .size()
-            .reset_index()
-            .rename(columns={0: "pieceCount"})
-        )
+    all_pieces_df = pd.DataFrame(all_pieces_data)
+    all_deals_df = pd.DataFrame(all_deals_data)
 
-        # Get a count of deals and the number of pieces in each deal, regardless of status or preparation ID
-        deals_count = (
-            all_deals_df.groupby("scheduleId")
-            .size()
-            .reset_index()
-            .rename(columns={0: "pieceCount"})
-        )
-        # Get a count of pieces in a deal grouped by status
-        pieces_count_by_deal_status = (
-            all_deals_df.groupby("state")
-            .size()
-            .reset_index()
-            .rename(columns={0: "pieceCount"})
-        )
-        # Get a count of pieces that are in a deal, grouped by pieceCid
-        pieces_count_by_deal_piece = (
-            all_deals_df.groupby("pieceCid")
-            .size()
-            .reset_index()
-            .rename(columns={0: "dealCount"})
-        )
+    return all_pieces_df, all_deals_df
 
-        # Further processing to identify preparations and pieces as per the flowchart
-        # This would involve more detailed logic based on the structure of your data
 
-        # Print summary statistics
-        print("Summary statistics:")
-        print("Total number of pieces by preparation ID:")
-        print(pieces_count_by_prep)
-        print("\nTotal number of pieces by preparation ID and status:")
-        print(pieces_count_by_prep_status)
-        print("\nTotal number of deals by status:")
-        print(pieces_count_by_deal_status)
-        print("\nTotal number of pieces by deal:")
+def get_pieces_count_by_prep(all_pieces_df):
+    return (
+        all_pieces_df.groupby("preparationId")
+        .size()
+        .reset_index()
+        .rename(columns={0: "TotalPieces"})
+    )
+
+
+def get_pieces_count_by_prep_status(all_deals_df):
+    return (
+        all_deals_df.groupby(["preparationId", "state"])
+        .size()
+        .reset_index()
+        .rename(columns={0: "pieceCount"})
+    )
+
+
+def get_deals_count(all_deals_df):
+    return (
+        all_deals_df.groupby("scheduleId")
+        .size()
+        .reset_index()
+        .rename(columns={0: "pieceCount"})
+    )
+
+
+def get_pieces_count_by_deal_status(all_deals_df):
+    return (
+        all_deals_df.groupby("state")
+        .size()
+        .reset_index()
+        .rename(columns={0: "pieceCount"})
+    )
+
+
+def get_pieces_count_by_deal_piece(all_deals_df):
+    return (
+        all_deals_df.groupby("pieceCid")
+        .size()
+        .reset_index()
+        .rename(columns={0: "dealCount"})
+    )
+
+
+def print_summary_statistics(all_pieces_df, all_deals_df) -> None:
+
+    pieces_count_by_prep = get_pieces_count_by_prep(all_pieces_df)
+    pieces_count_by_prep_status = get_pieces_count_by_prep_status(all_deals_df)
+    deals_count = get_deals_count(all_deals_df)
+    pieces_count_by_deal_status = get_pieces_count_by_deal_status(all_deals_df)
+    pieces_count_by_deal_piece = get_pieces_count_by_deal_piece(all_deals_df)
+
+    print("Summary statistics:")
+    print("Total number of pieces by preparation ID:")
+    print(pieces_count_by_prep)
+    print("\nTotal number of pieces by preparation ID and status:")
+    print(pieces_count_by_prep_status)
+    print("\nTotal number of deals by status:")
+    print(deals_count)
+    print("\nTotal number of pieces by deal:")
+    print(pieces_count_by_deal_status)
+    print("\nTotal number of pieces by deal piece:")
+    print(pieces_count_by_deal_piece)
+
+
+def get_file_details_from_piece(all_pieces_df):
+    # loop through each piece and get all the file details from the api request `/piece/<piece id>/metadata'`
+    file_details = []
+
+    for index, row in all_pieces_df.iterrows():
+        pieceCid = row["pieceCid"]
+        rootCid = row["rootCid"]
+
+        metadata_response = make_get_request(f"/piece/{pieceCid}/metadata")
+        if metadata_response:
+
+            # grab the files dict from the response and loop the list of dicts
+            file_metadata = metadata_response["files"]
+
+            # loop through each list of dicts in file_metadata:
+            # - create empty dict holder to store the file details
+            # - split the `path` key into two components, file_path and file_name based on the character `/`
+            # - append the missing '/' to the file_path which takes care of the case where the path is empty
+            # - add the rootCid and pieceCid key/value that comes from the dict `car` in metadata response
+            # extend the in loop dict to the file_details list
+
+            for file in file_metadata:
+                file_details_dict = {}
+                file_details_dict.update(file)
+                # Split the path check if it has a path or not
+                file_parts = file["path"].rsplit("/", 1)
+                if len(file_parts) == 2:
+                    file_path, file_name = file_parts
+                else:
+                    file_path, file_name = "", file_parts[0]
+                file_details_dict["path"] = file_path
+                file_details_dict["fileName"] = file_name
+                file_details_dict["rootCid"] = rootCid
+                file_details_dict["pieceCid"] = pieceCid
+                file_details.append(file_details_dict)
+
+    return pd.DataFrame(file_details)
+
+
+def fetch_sub_entries(prep_id, source_id, path="/"):
+    """
+    Fetches sub-entries from the API endpoint and returns a list of lists containing 'cid' and 'path'.
+    Recursively explores directories if 'isDir' is True.
+
+    Args:
+        prep_id (str): Preparation ID.
+        source_id (str): Source ID.
+        path (str): Path to explore (default is root).
+
+    Returns:
+        list: A list of lists containing 'cid' and 'path'.
+    """
+    url = f"/preparation/{prep_id}/source/{source_id}/explore/{path}"
+    data = make_get_request(url)
+
+    if not data:
+        return []
+
+    result = []
+
+    for entry in data.get("subEntries", []):
+        result.append([entry["cid"], entry["path"]])
+        if entry.get("isDir"):
+            # Recursively fetch sub-entries for directories
+            result.extend(fetch_sub_entries(prep_id, source_id, entry["path"]))
+
+    return result
 
 
 if __name__ == "__main__":
-    process_preparations()
+
+    # Create a list of all the directories and files in the preparation
+    if EXPORT_FILES:
+        files_from_prep = fetch_sub_entries(PREP_ID, SOURCE_ID)
+        # convert list of lists to a dataframe and modify the path column to only contain the file/directory name
+        files_from_prep_df = pd.DataFrame(files_from_prep, columns=["cid", "path"])
+        files_from_prep_df["path"] = files_from_prep_df["path"].apply(
+            lambda x: x.split("/")[-1]
+        )
+        files_from_prep_df.to_json(
+            f"{OUTPUT_FILENAME}.json", orient="records", lines=False
+        )
+
+    pieces_df, deals_df = process_preparations(PREP_ID)
+    file_deets = get_file_details_from_piece(pieces_df)
+    file_deets.to_csv(f"{OUTPUT_FILENAME}.csv", index=False)
